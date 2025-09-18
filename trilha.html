@@ -1,0 +1,390 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>FEITEC ZL 2025 — Trilha (8 atividades) • Automação & Logística Inteligente • ESG</title>
+<link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Nunito+Sans:wght@300;400;700;900&display=swap" rel="stylesheet">
+<style>
+:root{--green:#11c46b;--greenD:#0e9f58;--blue:#1e8ffb;--blueD:#0b59c9}
+*{box-sizing:border-box}
+body{
+  font-family:"Nunito Sans",system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif;color:#fff;
+  background:
+    radial-gradient(60rem 60rem at 12% 20%, rgba(17,196,107,.25), transparent 60%),
+    radial-gradient(70rem 70rem at 85% 10%, rgba(30,143,251,.25), transparent 60%),
+    linear-gradient(120deg,#0bbd71 0%,#0b59c9 100%);
+  min-height:100dvh;
+}
+.navbar{background:linear-gradient(90deg,var(--greenD),var(--blueD))}
+.badge-feitec{background:#fff;color:var(--blueD);font-weight:900}
+.container-narrow{max-width:1100px}
+#stage{position:relative;min-height:540px}
+.view{position:absolute;inset:0;opacity:0;transform:translateY(12px) scale(.98);transition:opacity .35s ease,transform .35s ease;pointer-events:none}
+.view.active{opacity:1;transform:translateY(0) scale(1);pointer-events:auto}
+.card{border-radius:1.1rem;border:1px solid rgba(255,255,255,.16);background:rgba(255,255,255,.10);backdrop-filter:blur(8px);color:#fff;box-shadow:0 8px 36px rgba(0,0,0,.25)}
+.btn-brand{background:var(--blueD);border:0;font-weight:800;text-transform:uppercase}
+.btn-brand:hover{background:#094aa6}
+.tag{background:rgba(255,255,255,.18);border:1px solid rgba(255,255,255,.3);border-radius:999px;padding:.25rem .6rem;font-weight:800}
+.progress .progress-bar{background:linear-gradient(90deg,#16a34a,var(--green))}
+.small-muted{opacity:.9}
+.grid{display:grid;gap:.4rem;grid-template-columns:repeat(10,1fr)}
+.cell{aspect-ratio:1/1;border-radius:.4rem;border:1px solid rgba(255,255,255,.25);background:rgba(255,255,255,.08);display:flex;align-items:center;justify-content:center;font-weight:900;cursor:pointer;user-select:none}
+.cell.obst{background:rgba(239,68,68,.55)}
+.cell.start{background:rgba(34,197,94,.7)}
+.cell.end{background:rgba(59,130,246,.7)}
+.cell.path{outline:3px solid #fff;background:rgba(255,255,255,.35)}
+.drag{padding:.45rem .6rem;background:#fff;color:#0b1220;border-radius:.6rem;font-weight:800;cursor:grab}
+.drop{min-height:3rem;border:2px dashed rgba(255,255,255,.6);border-radius:.8rem;padding:.5rem;display:flex;flex-wrap:wrap;gap:.5rem}
+.canvas{background:#0b1324;border-radius:1rem;border:1px solid rgba(255,255,255,.2);min-height:220px;color:#9ecbff;padding:1rem;font-variant-numeric:tabular-nums}
+.table-sm td,.table-sm th{padding:.35rem .55rem}
+footer{border-top:1px dashed rgba(255,255,255,.25)}
+/* ==== BARRA STICKY DE CONTROLES ==== */
+.controls-wrap{
+  position: sticky;
+  bottom: 0;
+  z-index: 1040;
+  background: rgba(11,19,36,.65);
+  backdrop-filter: blur(8px);
+  border: 1px solid rgba(255,255,255,.20);
+  border-radius: 14px;
+  padding: .6rem .8rem;
+  margin-top: 1rem;
+}
+.controls-wrap .btn{white-space:nowrap}
+@media (max-width: 576px){
+  .controls-wrap{border-radius:10px;padding:.5rem}
+}
+main{padding-bottom: 1.2rem;}
+</style>
+</head>
+<body>
+<nav class="navbar navbar-expand-lg navbar-dark">
+  <div class="container container-narrow">
+    <a class="navbar-brand d-flex align-items-center gap-2" href="#">
+      <span class="badge badge-feitec rounded-pill px-3 py-2">FEITEC + ESG</span>
+      <strong>Automação & Logística Inteligente</strong>
+    </a>
+    <div class="ms-auto d-none d-lg-flex gap-2">
+      <span class="tag">Environmental</span><span class="tag">Social</span><span class="tag">Governance</span>
+    </div>
+  </div>
+</nav>
+
+<header class="py-4">
+  <div class="container container-narrow">
+    <div class="row g-3 align-items-center">
+      <div class="col-lg-8">
+        <h1 class="fw-black text-uppercase" style="letter-spacing:.5px">Trilha Interativa — 8 atividades</h1>
+        <p class="lead">Cálculos e quizzes sobre <b>automação logística</b> conectada a <b>ESG</b>.</p>
+        <div class="d-flex align-items-center gap-3">
+          <div class="w-100">
+            <div class="small-muted">Seu ESG Score</div>
+            <div class="progress" style="height:12px"><div class="progress-bar" id="barESG" style="width:0%"></div></div>
+          </div>
+          <div class="text-end">
+            <div class="fs-3 fw-black" id="valESG">0%</div>
+            <small class="small-muted">CO₂e evitado: <span id="valCO2">0.0</span> kg</small>
+          </div>
+        </div>
+        <div class="mt-2 small-muted">Progresso: <span id="valProgress">0</span>/8</div>
+      </div>
+      <div class="col-lg-4 text-lg-end">
+        <button class="btn btn-brand px-4" id="btnContinue">Continuar ▶</button>
+        <div class="mt-2 small"><span id="checkpoint">Atividade 1/8</span> • <a href="#" id="btnReset" class="link-light">Reiniciar</a></div>
+      </div>
+    </div>
+  </div>
+</header>
+
+<main class="pb-5">
+  <div class="container container-narrow">
+    <div id="stage"></div>
+
+    <!-- BARRA STICKY DE CONTROLES -->
+    <div class="controls-wrap d-flex justify-content-between align-items-center">
+      <button class="btn btn-light text-dark fw-bold" id="btnPrev">◀ Anterior</button>
+      <div class="d-flex gap-2 align-items-center">
+        <button class="btn btn-success fw-bold" id="btnCheck">Validar</button>
+        <button class="btn btn-brand" id="btnNext">Próxima ▶</button>
+      </div>
+    </div>
+  </div>
+</main>
+
+<footer class="py-4 text-center text-white-50">
+  <div class="container container-narrow">
+    <small>FEITEC ZL 2025 • Feira Educativa de Inovação e Tecnologia — Tema: ESG • Estação: Automação & Logística Inteligente</small>
+  </div>
+</footer>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+<script>
+/* =================== Persistência e KPIs =================== */
+const store={get:(k,d)=>JSON.parse(localStorage.getItem(k)??JSON.stringify(d)),set:(k,v)=>localStorage.setItem(k,JSON.stringify(v))};
+let state=store.get('feitec8_sticky_state',{idx:0,esg:0,co2:0,done:Array(8).fill(false)});
+function setESG(dESG=0,dCO2=0){state.esg=Math.max(0,Math.min(100,state.esg+dESG));state.co2=Math.max(0,state.co2+dCO2);
+  document.getElementById('barESG').style.width=state.esg+'%';
+  document.getElementById('valESG').textContent=Math.round(state.esg)+'%';
+  document.getElementById('valCO2').textContent=state.co2.toFixed(1);
+  store.set('feitec8_sticky_state',state);}
+function setProgressDone(i){if(!state.done[i]){state.done[i]=true;store.set('feitec8_sticky_state',state)};document.getElementById('valProgress').textContent=state.done.filter(Boolean).length;}
+function updateChk(){document.getElementById('checkpoint').textContent=`Atividade ${state.idx+1}/8`}
+
+/* =================== UI util =================== */
+const stage=document.getElementById('stage');
+function clearStage(){stage.innerHTML='';}
+function view(html){const v=document.createElement('div');v.className='view active';v.innerHTML=html;stage.appendChild(v);return v;}
+function toast(msg,type='success'){const d=document.createElement('div');d.className=`alert alert-${type} position-fixed top-0 start-50 translate-middle-x mt-3`;d.style.zIndex=9999;d.textContent=msg;document.body.appendChild(d);setTimeout(()=>d.remove(),1600);}
+
+/* =================== 8 atividades =================== */
+const Activities=[];
+
+/* 1) Picking (A*) — cálculo de rota */
+Activities.push({
+  title:'Picking Planner (A*)',
+  concept:'Roteamento interno reduz tempo/energia e risco.',
+  builder:(v,i)=>{
+    v.innerHTML=`<div class="card p-3">
+      <div class="d-flex justify-content-between">
+        <div><span class="badge bg-light text-dark me-2">${i+1}/8</span><b>Picking Planner</b></div>
+        <div class="small-muted">Defina <b>Início</b>, <b>Destino</b> e <b>Obstáculos</b>. Depois <b>Calcular</b>.</div>
+      </div>
+      <div class="mt-2 d-flex gap-2 flex-wrap">
+        <button class="btn btn-sm btn-light" id="bS">Início</button>
+        <button class="btn btn-sm btn-light" id="bE">Destino</button>
+        <button class="btn btn-sm btn-warning text-dark" id="bO">Obstáculo</button>
+        <button class="btn btn-sm btn-outline-light" id="bX">Borracha</button>
+        <button class="btn btn-sm btn-success" id="bGo">Calcular</button>
+        <button class="btn btn-sm btn-secondary" id="bNew">Novo layout</button>
+      </div>
+      <div id="grid" class="grid mt-2"></div>
+      <div class="canvas mt-2" id="out">Monte o cenário…</div>
+    </div>`;
+    const N=10, gridEl=v.querySelector('#grid'), out=v.querySelector('#out'); let mode='S',start=null,end=null,grid;
+    function gen(){const rate=0.20;grid=Array.from({length:N},()=>Array(N).fill(0));
+      for(let r=0;r<N;r++)for(let c=0;c<N;c++)if(Math.random()<rate)grid[r][c]=1; start={r:0,c:0}; end={r:N-1,c:N-1}; render();}
+    function render(){gridEl.innerHTML='';for(let r=0;r<N;r++)for(let c=0;c<N;c++){const el=document.createElement('div');el.className='cell';if(grid[r][c]===1)el.classList.add('obst');if(start&&start.r===r&&start.c===c){el.classList.add('start');el.textContent='S'} if(end&&end.r===r&&end.c===c){el.classList.add('end');el.textContent='D'} el.onclick=()=>{if(mode==='S')start={r,c};else if(mode==='E')end={r,c};else if(mode==='O')grid[r][c]=1;else grid[r][c]=0;render()};gridEl.appendChild(el);}}
+    const neigh=p=>[[1,0],[-1,0],[0,1],[0,-1]].map(([dr,dc])=>({r:p.r+dr,c:p.c+dc})).filter(q=>q.r>=0&&q.c>=0&&q.r<N&&q.c<N&&grid[q.r][q.c]!==1);
+    const h=(a,b)=>Math.abs(a.r-b.r)+Math.abs(a.c-b.c);
+    function calc(){if(!start||!end){toast('Defina início/destino','warning');return}
+      const key=p=>p.r+','+p.c,open=[start],came=new Map(),g=new Map(),f=new Map();g.set(key(start),0);f.set(key(start),h(start,end));const seen=new Set([key(start)]);
+      while(open.length){open.sort((a,b)=>(f.get(key(a))??9e9)-(f.get(key(b))??9e9));const cur=open.shift();if(cur.r===end.r&&cur.c===end.c){let path=[cur],k=key(cur);while(came.has(k)){const pv=came.get(k);path.push(pv);k=key(pv)}document.querySelectorAll('#stage .cell').forEach(x=>x.classList.remove('path'));path.forEach(p=>gridEl.children[p.r*N+p.c].classList.add('path'));
+        const steps=path.length-1;out.innerHTML=`Passos: <b>${steps}</b> • Tempo: <b>${(steps*1.2).toFixed(1)}s</b> • Energia: <b>${(steps*0.05).toFixed(2)} Wh</b>`;
+        setESG(2,steps*0.02);setProgressDone(i);return}
+        for(const nb of neigh(cur)){const t=(g.get(key(cur))??9e9)+1;if(t<(g.get(key(nb))??9e9)){came.set(key(nb),cur);g.set(key(nb),t);f.set(key(nb),t+h(nb,end));if(!seen.has(key(nb))){open.push(nb);seen.add(key(nb))}}}}
+      out.textContent='Sem caminho — remova bloqueios.'}
+    v.querySelector('#bS').onclick=()=>mode='S';v.querySelector('#bE').onclick=()=>mode='E';v.querySelector('#bO').onclick=()=>mode='O';v.querySelector('#bX').onclick=()=>mode='X';
+    v.querySelector('#bGo').onclick=calc; v.querySelector('#bNew').onclick=gen; gen();
+  },check:()=>true});
+
+/* 2) Consolidação — cálculo de km/CO₂e */
+Activities.push({
+  title:'Consolidação de Entregas',
+  concept:'Balancear carga e roteiros reduz CO₂e.',
+  builder:(v,i)=>{
+    v.innerHTML=`<div class="card p-3">
+      <div class="d-flex justify-content-between"><div><span class="badge bg-light text-dark me-2">${i+1}/8</span><b>Consolidação</b></div><div class="small-muted">Arraste pedidos para VUC A/B e <b>Simular</b>.</div></div>
+      <div class="d-flex gap-3 flex-wrap my-2">
+        <div class="card p-2" style="min-width:240px"><div class="fw-bold">Pedidos</div><div id="orders" class="d-flex gap-2 flex-wrap"></div></div>
+        <div class="card p-2"><div class="fw-bold">VUC A <span class="badge bg-light text-dark" id="capA"></span></div><div id="truckA" class="drop my-2"></div></div>
+        <div class="card p-2"><div class="fw-bold">VUC B <span class="badge bg-light text-dark" id="capB"></span></div><div id="truckB" class="drop my-2"></div></div>
+      </div>
+      <div class="d-flex gap-2"><button class="btn btn-success btn-sm" id="simulate">Simular</button><span class="ms-2">Score: <b id="score">0</b></span></div>
+      <table class="table table-sm mt-2"><tr><th></th><th>Distância</th><th>CO₂e</th></tr><tr><td>A</td><td id="kmA">—</td><td id="co2A">—</td></tr><tr><td>B</td><td id="kmB">—</td><td id="co2B">—</td></tr><tr class="table-light text-dark"><td>Total</td><td id="kmT">—</td><td id="co2T">—</td></tr></table>
+    </div>`;
+    const ordersEl=v.querySelector('#orders'), A=v.querySelector('#truckA'), B=v.querySelector('#truckB'); const capA=v.querySelector('#capA'), capB=v.querySelector('#capB');
+    let data=[],alloc={};
+    function make(){
+      const n=7, cap=1100;
+      capA.textContent=`0/${cap} kg`; capB.textContent=`0/${cap} kg`;
+      data=Array.from({length:n}).map((_,k)=>({id:'P'+(k+1),kg:120+Math.floor(Math.random()*280),x:5+Math.floor(Math.random()*30),y:5+Math.floor(Math.random()*30)}));
+      ordersEl.innerHTML=''; data.forEach(o=>{const d=document.createElement('div');d.className='drag';d.draggable=true;d.dataset.id=o.id;d.textContent=`${o.id} • ${o.kg} kg • (${o.x},${o.y})`;d.addEventListener('dragstart',e=>e.dataTransfer.setData('text/plain',o.id));ordersEl.appendChild(d);});
+      [A,B,ordersEl].forEach(el=>{el.addEventListener('dragover',e=>e.preventDefault());el.addEventListener('drop',e=>{e.preventDefault();const id=e.dataTransfer.getData('text/plain');el.appendChild(document.querySelector('.drag[data-id="'+id+'"]'));alloc[id]=(el===A?'A':el===B?'B':null);updateCaps(cap);});});
+      alloc={};updateCaps(cap);
+    }
+    function updateCaps(cap){const sum=t=>data.filter(o=>alloc[o.id]===t).reduce((s,o)=>s+o.kg,0);capA.textContent=`${sum('A')}/${cap} kg`;capB.textContent=`${sum('B')}/${cap} kg`;}
+    const dist=list=>{let last={x:0,y:0},d=0;list.forEach(o=>{d+=Math.hypot(o.x-last.x,o.y-last.y);last=o});d+=Math.hypot(last.x,last.y);return d*0.6;}
+    v.querySelector('#simulate').onclick=()=>{const LA=data.filter(o=>alloc[o.id]==='A'), LB=data.filter(o=>alloc[o.id]==='B');const kmA=dist(LA),kmB=dist(LB),ef=0.25;v.querySelector('#kmA').textContent=kmA.toFixed(1)+' km';v.querySelector('#kmB').textContent=kmB.toFixed(1)+' km';v.querySelector('#kmT').textContent=(kmA+kmB).toFixed(1)+' km';v.querySelector('#co2A').textContent=(kmA*ef).toFixed(1)+' kg';v.querySelector('#co2B').textContent=(kmB*ef).toFixed(1)+' kg';v.querySelector('#co2T').textContent=((kmA+kmB)*ef).toFixed(1)+' kg';
+      const capDiff=Math.abs(LA.reduce((s,o)=>s+o.kg,0)-LB.reduce((s,o)=>s+o.kg,0));const score=Math.max(0,400-capDiff*0.35-(kmA+kmB)*1.8);v.querySelector('#score').textContent=score.toFixed(0);setESG(4,Math.max(0,60-(kmA+kmB)*ef*0.2));setProgressDone(i);};
+    make();
+  },check:()=>true});
+
+/* 3) EOQ — cálculo de lote econômico */
+Activities.push({
+  title:'EOQ — Lote Econômico',
+  concept:'Q* = √(2DS/H) minimiza custo anual.',
+  builder:(v,i)=>{
+    v.innerHTML=`<div class="card p-3"><div><span class="badge bg-light text-dark me-2">${i+1}/8</span><b>Jogo do EOQ</b></div>
+      <div class="row g-3 mt-1"><div class="col-lg-6">
+        <label class="form-label">Demanda (D)</label><input type="range" id="D" min="1000" max="60000" value="12000" class="form-range">
+        <div class="small-muted">D = <b id="valD">12000</b></div>
+        <label class="form-label mt-2">Custo de pedido (S)</label><input type="range" id="S" min="50" max="2500" value="400" class="form-range">
+        <div class="small-muted">S = R$ <b id="valS">400</b></div>
+        <label class="form-label mt-2">Custo de manter (H)</label><input type="range" id="H" class="form-range" min="1" max="50" value="12">
+        <div class="small-muted">H = R$ <b id="valH">12</b> /un/ano</div>
+        <button class="btn btn-brand mt-2" id="go">Calcular</button></div>
+        <div class="col-lg-6"><div class="canvas" id="out">Ajuste e calcule…</div></div></div></div>`;
+    const D=v.querySelector('#D'),S=v.querySelector('#S'),H=v.querySelector('#H');
+    const upd=()=>{v.querySelector('#valD').textContent=D.value;v.querySelector('#valS').textContent=S.value;v.querySelector('#valH').textContent=H.value};[D,S,H].forEach(x=>x.addEventListener('input',upd));upd();
+    v.querySelector('#go').onclick=()=>{const d=+D.value,s=+S.value,h=+H.value;const Q=Math.sqrt(2*d*s/h),N=d/Q,CT=(N*s)+((Q/2)*h);v.querySelector('#out').innerHTML=`Q* = <b>${Q.toFixed(0)}</b> • Pedidos/ano ≈ <b>${N.toFixed(1)}</b> • Custo ≈ <b>R$ ${CT.toFixed(2)}</b>`;setESG(2,Q*0.01);setProgressDone(i);};
+  },check:()=>true});
+
+/* 4) Forecast — média móvel */
+Activities.push({title:'Previsão (média móvel)',concept:'Planejar demanda evita urgências.',
+  builder:(v,i)=>{
+    v.innerHTML=`<div class="card p-3"><div><span class="badge bg-light text-dark me-2">${i+1}/8</span><b>Mini-Forecast</b></div>
+      <label class="form-label mt-1">Vendas (6 meses, vírgula)</label><input id="series" class="form-control" value="120,130,140,150,160,180">
+      <label class="form-label mt-2">Janela k</label><input type="number" id="k" class="form-control" value="3" min="2" max="5">
+      <button class="btn btn-brand mt-2" id="go">Prever</button><div class="canvas mt-2" id="out">Insira série…</div></div>`;
+    v.querySelector('#go').onclick=()=>{const s=v.querySelector('#series').value.split(',').map(x=>+x.trim()).filter(x=>!isNaN(x));const k=Math.max(2,Math.min(5,+v.querySelector('#k').value||3));if(s.length<k){toast('Série curta','warning');return}const last=s.slice(-k),avg=last.reduce((a,b)=>a+b,0)/k;v.querySelector('#out').innerHTML=`Prev. próxima = <b>${avg.toFixed(1)}</b>`;setESG(1,0);setProgressDone(i);};},check:()=>true});
+
+/* 5) CO₂e por modal — cálculo comparativo */
+Activities.push({title:'CO₂e Transportes',concept:'Compare modais por t.km.',
+  builder:(v,i)=>{v.innerHTML=`<div class="card p-3"><div><span class="badge bg-light text-dark me-2">${i+1}/8</span><b>CO₂e por Modal</b></div>
+    <div class="row g-2 mt-1"><div class="col-4"><label class="form-label">Distância (km)</label><input type="number" id="km" class="form-control" value="120"></div>
+    <div class="col-4"><label class="form-label">Carga (t)</label><input type="number" id="ton" class="form-control" value="0.8" step=".1"></div>
+    <div class="col-4"><label class="form-label">Modal</label><select id="modal" class="form-select">
+      <option value="rod">Rodoviário</option>
+      <option value="ferro">Ferroviário</option>
+      <option value="hidro">Hidroviário</option>
+      <option value="eletrico">Rod. Elétrico</option>
+      <option value="aereo">Aéreo</option>
+    </select></div></div>
+    <button class="btn btn-success mt-2" id="go">Calcular</button><div class="canvas mt-2" id="out">Insira dados…</div></div>`;
+    const factors={rod:0.12,ferro:0.035,hidro:0.025,aereo:0.60,eletrico:0.02};
+    v.querySelector('#go').onclick=()=>{const km=+v.querySelector('#km').value, ton=+v.querySelector('#ton').value, mod=v.querySelector('#modal').value;const tkm=km*Math.max(ton,0),co2=tkm*factors[mod],base=tkm*factors.rod,saved=Math.max(0,base-co2);v.querySelector('#out').innerHTML=`tkm=<b>${tkm.toFixed(2)}</b><br>CO₂e=<b>${co2.toFixed(2)} kg</b><br>vs Rodoviário: <b>−${saved.toFixed(2)} kg</b>`;setESG(saved>0?2:.5,saved);setProgressDone(i);};},check:()=>true});
+
+/* 6) Kanban/WIP — cálculo de utilização e WIP */
+Activities.push({title:'Kanban & WIP',concept:'Limites WIP reduzem lead time.',
+  builder:(v,i)=>{v.innerHTML=`<div class="card p-3"><div><span class="badge bg-light text-dark me-2">${i+1}/8</span><b>Kanban/WIP</b></div>
+  <div class="row g-2 mt-1"><div class="col"><label class="form-label">Chegadas/h</label><input id="lam" type="number" class="form-control" value="14"></div>
+  <div class="col"><label class="form-label">Capacidade/h</label><input id="mu" type="number" class="form-control" value="20"></div>
+  <div class="col"><label class="form-label">WIP Máx</label><input id="w" type="number" class="form-control" value="6"></div></div>
+  <button class="btn btn-brand mt-2" id="go">Simular</button><div class="canvas mt-2" id="out"></div></div>`;
+  v.querySelector('#go').onclick=()=>{const lam=+v.querySelector('#lam').value,mu=+v.querySelector('#mu').value,w=+v.querySelector('#w').value;const rho=Math.min(.99,lam/mu);const L=rho/(1-rho);const Lw=Math.max(0,L-w);v.querySelector('#out').innerHTML=`Utilização ρ=<b>${rho.toFixed(2)}</b><br>WIP médio≈<b>${L.toFixed(2)}</b> • Excesso vs WIPmáx≈<b>${Lw.toFixed(2)}</b>`;setESG(.8,0);setProgressDone(i);};},check:()=>true});
+
+/* 7) Jogo de Trade-offs ESG (pontuação) */
+Activities.push({
+  title:'Jogo de Trade-offs ESG (Pontuação)',
+  concept:'Distribua orçamento em ações com impacto A/S/G e restrições.',
+  builder:(v,i)=>{
+    v.innerHTML=`<div class="card p-3">
+      <div class="d-flex justify-content-between"><div><span class="badge bg-light text-dark me-2">${i+1}/8</span><b>Alocação de Orçamento ESG</b></div>
+      <div class="small-muted">Você tem <b>100 pts</b>. Escolha ações (máx. 5) e maximize o score.</div></div>
+      <div class="row g-3 mt-1">
+        <div class="col-md-7"><div class="card p-2">
+          <div class="fw-bold mb-2">Ações disponíveis</div>
+          <div id="bank" class="d-flex flex-wrap gap-2"></div>
+        </div></div>
+        <div class="col-md-5"><div class="card p-2">
+          <div class="fw-bold mb-2">Seu portfólio <small class="text-white-50">(máx 5)</small></div>
+          <div id="bag" class="drop"></div>
+          <div class="mt-2 canvas" id="out">Adicione ações para ver o score…</div>
+        </div></div>
+      </div>
+    </div>`;
+    const actions=[
+      {id:'VUC elétrico',cost:28,A:9,S:6,G:6,co2:8},
+      {id:'Painéis solares DC',cost:24,A:8,S:5,G:6,co2:7},
+      {id:'Treinamento EPI',cost:12,A:3,S:9,G:6,co2:1},
+      {id:'RFID + trilha de auditoria',cost:18,A:5,S:5,G:9,co2:2},
+      {id:'Roteirização por IA',cost:16,A:7,S:4,G:5,co2:5},
+      {id:'Micro-hubs + lockers',cost:22,A:7,S:7,G:5,co2:6},
+      {id:'Gás natural veicular',cost:14,A:4,S:4,G:4,co2:3},
+      {id:'Frota diesel Euro VI',cost:10,A:3,S:3,G:4,co2:2},
+      {id:'Programa diversidade',cost:15,A:0,S:9,G:6,co2:0},
+      {id:'Contrato verde fornecedores',cost:20,A:6,S:5,G:8,co2:3},
+    ];
+    const bank=v.querySelector('#bank'), bag=v.querySelector('#bag'), out=v.querySelector('#out');
+    const budget=100, maxSel=5; let chosen=[];
+    function chip(a){const d=document.createElement('div');d.className='drag';d.draggable=true;d.dataset.id=a.id;d.textContent=`${a.id} • ${a.cost} pts`;d.addEventListener('dragstart',e=>e.dataTransfer.setData('text/plain',a.id));return d;}
+    actions.forEach(a=>bank.appendChild(chip(a)));
+    [bank,bag].forEach(el=>{el.addEventListener('dragover',e=>e.preventDefault());el.addEventListener('drop',e=>{e.preventDefault();const id=e.dataTransfer.getData('text/plain');const a=actions.find(x=>x.id===id);
+      if(el===bag){ if(chosen.find(x=>x.id===id)) return; if(chosen.length>=maxSel){toast('Máximo de 5 ações','warning');return}
+        chosen.push(a); el.appendChild(chip(a));
+      }else{ chosen=chosen.filter(x=>x.id!==id); bank.appendChild(chip(a)); }
+      score();
+    });});
+    function score(){
+      const totCost=chosen.reduce((s,a)=>s+a.cost,0);
+      const A=chosen.reduce((s,a)=>s+a.A,0), S=chosen.reduce((s,a)=>s+a.S,0), G=chosen.reduce((s,a)=>s+a.G,0);
+      const co2=chosen.reduce((s,a)=>s+a.co2,0);
+      let penalty=0, bonus=0;
+      if(totCost>budget) penalty+=(totCost-budget)*2;
+      if(A>0 && G===0) penalty+=10;
+      if(S>0 && A===0) penalty+=6;
+      if(chosen.some(a=>a.id.includes('diesel')) && chosen.some(a=>a.id.includes('VUC'))) penalty+=8;
+      if(chosen.some(a=>a.id.includes('RFID')) && chosen.some(a=>a.id.includes('Contrato'))) bonus+=6;
+      const balancePenalty = Math.abs(A-S)+Math.abs(S-G)+Math.abs(G-A);
+      const raw= A*2 + S*2 + G*2 + co2*3 + bonus - penalty - balancePenalty*0.5;
+      const final=Math.max(0,Math.round(raw));
+      out.innerHTML=`<b>Gasto</b>: ${totCost}/${budget} pts<br>
+        ESG(A/S/G): <b>${A}/${S}/${G}</b> • CO₂e potencial evitado: <b>${co2}</b><br>
+        Bônus: <b>${bonus}</b> • Penalidades: <b>${penalty.toFixed(1)}</b> • Balance: −<b>${(balancePenalty*0.5).toFixed(1)}</b><br>
+        <span class="fs-5">Score final: <b>${final}</b></span>`;
+      if(final>=40){ setESG(4,co2*0.4); setProgressDone(i); }
+    }
+  },check:()=>true});
+
+/* 8) Quiz Final — governança/logística/ESG */
+Activities.push({
+  title:'Quiz Final (GRC + Logística)',
+  concept:'Boas práticas: rastreabilidade, auditoria, ética e eficiência.',
+  builder:(v,i)=>{
+    v.innerHTML=`<div class="card p-3">
+      <div class="d-flex justify-content-between"><div><span class="badge bg-light text-dark me-2">${i+1}/8</span><b>Quiz Final</b></div>
+      <div class="small-muted">Acerte tudo para concluir.</div></div>
+      <ol class="mt-2">
+        <li>Registrar eventos de manutenção de esteiras é…<br>
+          <label><input type="radio" name="q1"> opcional</label> •
+          <label><input type="radio" name="q1" value="ok"> parte de auditoria e rastreabilidade</label>
+        </li>
+        <li>Escolher fornecedor apenas pelo menor preço…<br>
+          <label><input type="radio" name="q2" value="ok"> ignora critérios ESG relevantes</label> •
+          <label><input type="radio" name="q2"> é suficiente</label>
+        </li>
+        <li>Comparar modais por <i>t.km</i> e fator de emissão serve para…<br>
+          <label><input type="radio" name="q3" value="ok"> reduzir CO₂e na malha</label> •
+          <label><input type="radio" name="q3"> escolher o mais rápido sempre</label>
+        </li>
+        <li>Limitar WIP no Kanban ajuda a…<br>
+          <label><input type="radio" name="q4" value="ok"> reduzir lead time e sobrecarga</label> •
+          <label><input type="radio" name="q4"> aumentar filas</label>
+        </li>
+      </ol>
+      <button class="btn btn-success btn-sm" id="go">Conferir</button>
+      <div class="mt-2" id="out"></div>
+    </div>`;
+    v.querySelector('#go').onclick=()=>{
+      const ok=['q1','q2','q3','q4'].every(q=> v.querySelector(`input[name=${q}][value=ok]:checked`));
+      if(!ok){ v.querySelector('#out').textContent='Revise suas respostas.'; return; }
+      v.querySelector('#out').textContent='✅ 4/4 — Parabéns! Trilha concluída.';
+      setESG(5,0); setProgressDone(i);
+    };
+  },check:()=>true});
+
+/* =================== Router =================== */
+function goTo(i){
+  if(i<0)i=0;if(i>Activities.length-1)i=Activities.length-1;
+  state.idx=i; store.set('feitec8_sticky_state',state);
+  clearStage();
+  const a=Activities[i];
+  const v=view(`<div class="card p-3 mb-2 d-flex justify-content-between align-items-center">
+    <div><b>${a.title}</b></div><small class="text-white-50">${a.concept}</small>
+  </div><div id="content"></div>`);
+  a.builder(v.querySelector('#content'),i);
+  updateChk();
+}
+document.getElementById('btnPrev').onclick=()=>goTo(state.idx-1);
+document.getElementById('btnNext').onclick=()=>goTo(state.idx+1);
+document.getElementById('btnContinue').onclick=()=>goTo(state.idx+1);
+document.getElementById('btnReset').onclick=(e)=>{e.preventDefault();if(confirm('Reiniciar trilha?')){localStorage.removeItem('feitec8_sticky_state');location.reload();}};
+document.getElementById('btnCheck').onclick=()=>{const ok=Activities[state.idx].check?.();if(ok)toast('Atividade verificada')};
+
+setESG(0,0);document.getElementById('valProgress').textContent=state.done.filter(Boolean).length;updateChk();goTo(state.idx);
+</script>
+</body>
+</html>
