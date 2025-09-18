@@ -1,0 +1,608 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1"/>
+<title>Eco Truck — Plataforma ESG</title>
+<style>
+  :root{
+    --bg1:#0a1930; --bg2:#0d274e; --city:#12325f; --city2:#1a3e73; --road:#0b1220;
+    --ui:#ffffff; --accent:#11c46b; --danger:#ef4444; --gold:#ffd166;
+  }
+  html,body{margin:0;height:100%;background:linear-gradient(#0a1930,#0b1220);font-family:system-ui,Segoe UI,Roboto,Arial,sans-serif;color:#fff}
+  .wrap{display:flex;flex-direction:column;align-items:center;gap:.6rem;padding:10px}
+  canvas{background:linear-gradient(180deg,#0a1930 0%,#0d274e 40%,#0b1220 100%);border-radius:12px;box-shadow:0 12px 40px rgba(0,0,0,.45);max-width:100%;height:auto}
+  .hud{position:relative;width:min(960px,95vw);display:flex;justify-content:space-between;align-items:center;gap:.5rem}
+  .pill{background:rgba(255,255,255,.14);border:1px solid rgba(255,255,255,.25);backdrop-filter:blur(6px);border-radius:999px;padding:.35rem .75rem;display:inline-flex;gap:.6rem;align-items:center}
+  .tag{padding:.1rem .5rem;border-radius:999px;border:1px solid rgba(255,255,255,.25);font-weight:700}
+  .life{width:14px;height:14px;border-radius:3px;background:var(--danger);display:inline-block;margin-right:4px;box-shadow:0 0 8px rgba(239,68,68,.65)}
+  .btn{cursor:pointer;border:0;border-radius:10px;background:#1e8ffb;color:#fff;padding:.45rem .8rem;font-weight:800}
+  .btn:active{transform:translateY(1px)}
+  .overlay{
+    position:absolute;inset:0;display:flex;flex-direction:column;justify-content:center;align-items:center;
+    background:radial-gradient(60rem 40rem at 50% 30%, rgba(17,196,107,.1), transparent 60%); text-align:center; padding:1rem;
+  }
+  .panel{background:rgba(255,255,255,.1);border:1px solid rgba(255,255,255,.25);backdrop-filter:blur(10px);border-radius:14px;padding:1rem;max-width:760px}
+  ul{margin:.25rem 0;padding-left:1rem}
+  .kbd{background:#111827;color:#fff;border:1px solid #374151;border-bottom-width:3px;border-radius:6px;padding:.05rem .35rem;font-weight:800}
+  .legend{display:flex;gap:.4rem;flex-wrap:wrap}
+  .legend .tag{font-size:.85rem}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="hud">
+    <div class="pill">
+      <strong>Pontuação:</strong> <span id="score">0</span>
+      <span class="tag" style="background:rgba(17,196,107,.15)">Papel +10</span>
+      <span class="tag" style="background:rgba(30,143,251,.15)">Plástico +15</span>
+      <span class="tag" style="background:rgba(56,189,248,.15)">Vidro +20</span>
+      <span class="tag" style="background:rgba(255,209,102,.15)">Metal +25</span>
+    </div>
+    <div class="pill">
+      <strong>Vidas:</strong>
+      <span id="lives"></span>
+    </div>
+    <div class="pill">
+      <button class="btn" id="btnStart">Start (Enter)</button>
+      <button class="btn" id="btnMute">Som: ON (M)</button>
+      <button class="btn" id="btnPause">Pausar (P)</button>
+    </div>
+  </div>
+
+  <canvas id="game" width="960" height="540" aria-label="Jogo de plataforma do caminhão ecológico"></canvas>
+
+  <!-- Overlays -->
+  <div id="startOverlay" class="overlay" style="display:flex;">
+    <div class="panel">
+      <h1 style="margin:.2rem 0">🚚 Eco Truck — Plataforma ESG</h1>
+      <p>Ajude o caminhão a <b>coletar recicláveis</b> (papel, plástico, vidro, metal) e a <b>eliminar obstáculos</b> do caminho. Desvie de poluição e derramamentos!</p>
+      <div class="legend">
+        <span class="tag">Movimento: <span class="kbd">←</span> <span class="kbd">→</span></span>
+        <span class="tag">Pular: <span class="kbd">↑</span></span>
+        <span class="tag">Atirar: <span class="kbd">Espaço</span></span>
+        <span class="tag">Iniciar: <span class="kbd">Enter</span></span>
+        <span class="tag">Pausar: <span class="kbd">P</span></span>
+        <span class="tag">Som: <span class="kbd">M</span></span>
+      </div>
+      <p style="opacity:.9">Cada categoria vale pontos diferentes. Você tem <b>3 vidas</b>. Boa sorte! 🌱</p>
+      <button class="btn" id="startBtn2">Começar</button>
+    </div>
+  </div>
+
+  <div id="gameOverOverlay" class="overlay" style="display:none;">
+    <div class="panel" id="gameOverPanel">
+      <!-- preenchido via JS -->
+    </div>
+  </div>
+</div>
+
+<script>
+/* ========= util ========= */
+const rnd = (a,b)=>Math.random()*(b-a)+a;
+const clamp = (x,a,b)=>Math.min(b,Math.max(a,x));
+
+/* ========= áudio (WebAudio “MIDI-like”) ========= */
+let audioCtx=null, masterGain=null, musicOn=true;
+function ensureAudio(){
+  if(audioCtx) return;
+  audioCtx = new (window.AudioContext||window.webkitAudioContext)();
+  masterGain = audioCtx.createGain(); masterGain.gain.value = 0.25; masterGain.connect(audioCtx.destination);
+}
+function beep(freq=440, dur=0.08, type='square', vol=0.4){
+  if(!musicOn || !audioCtx) return;
+  const o = audioCtx.createOscillator(), g = audioCtx.createGain();
+  o.type = type; o.frequency.value = freq;
+  g.gain.value = vol; o.connect(g); g.connect(masterGain);
+  const t = audioCtx.currentTime;
+  g.gain.setValueAtTime(vol, t);
+  g.gain.exponentialRampToValueAtTime(0.0001, t+dur);
+  o.start(t); o.stop(t+dur);
+}
+let musicId=null;
+function startMusic(){
+  if(!musicOn) return;
+  ensureAudio();
+  stopMusic();
+  // loop simples (I–V–vi–IV) em arpejo 8-bit
+  const tempo=100; // bpm
+  const spb=60/tempo;
+  const notes = [ // em C maior
+    261.63,329.63,392.00, // C major (C E G)
+    196.00,246.94,392.00, // G (G B D)
+    220.00,261.63,329.63, // Am (A C E)
+    174.61,220.00,293.66  // F (F A C)
+  ];
+  let step=0;
+  musicId = setInterval(()=>{
+    if(!musicOn || !audioCtx) return;
+    const f = notes[step%notes.length];
+    beep(f, 0.12, 'triangle', 0.22);
+    step++;
+  }, spb*1000);
+}
+function stopMusic(){ if(musicId){clearInterval(musicId); musicId=null;} }
+
+/* ========= jogo ========= */
+const canvas = document.getElementById('game');
+const ctx = canvas.getContext('2d');
+
+const G = 0.8;         // gravidade
+const FRICTION = 0.85; // atrito no chão
+const MAX_VX = 5.0;
+const JUMP_VY = -12.5;
+
+let keys = {};
+let gameState = 'start'; // start | playing | paused | gameover
+let score = 0;
+let lives = 3;
+let time = 0;
+
+const world = {
+  width: 2000,
+  height: canvas.height,
+  camX: 0
+};
+
+const player = {
+  x: 80, y: 0, w: 64, h: 30,
+  vx: 0, vy: 0,
+  onGround: false,
+  facing: 1,
+  canShoot: true, shootCooldown: 0
+};
+
+const bullets = [];
+const pickups = [];
+const obstacles = [];
+const platforms = [];
+
+/* categorias recicláveis */
+const CATS = [
+  {name:'Papel', color:'#86efac', score:10},
+  {name:'Plástico', color:'#60a5fa', score:15},
+  {name:'Vidro', color:'#38bdf8', score:20},
+  {name:'Metal', color:'#ffd166', score:25}
+];
+
+/* obstáculos ESG */
+const OBSTS = [
+  {name:'Fumaça', type:'smoke'},    // pode destruir com tiro
+  {name:'Óleo', type:'oil'}         // não destrói, precisa desviar
+];
+
+/* construir o cenário urbano (plataformas + skyline) */
+function buildLevel(){
+  platforms.length=0; pickups.length=0; obstacles.length=0; bullets.length=0;
+  score=0; lives=3; time=0;
+  player.x=80; player.y=320; player.vx=0; player.vy=0;
+
+  // chão contínuo
+  platforms.push({x:0,y:420,w:world.width,h:40,type:'ground'});
+
+  // algumas plataformas suspensas
+  const pl = [
+    {x:260,y:360,w:180,h:16},{x:520,y:330,w:160,h:16},
+    {x:780,y:300,w:140,h:16},{x:1020,y:340,w:180,h:16},
+    {x:1280,y:280,w:160,h:16},{x:1520,y:320,w:200,h:16},
+    {x:1760,y:300,w:160,h:16}
+  ];
+  pl.forEach(p=>platforms.push(p));
+
+  // espalhar recicláveis
+  for(let i=0;i<28;i++){
+    const c = CATS[i % CATS.length];
+    const base = (i%2===0) ? 420-24 : pl[(i%pl.length)].y-20;
+    const baseX = (i%2===0) ? rnd(60,world.width-80) : pl[(i%pl.length)].x + rnd(20, pl[(i%pl.length)].w-20);
+    pickups.push({x:baseX,y:base-12,w:16,h:16,cat:c});
+  }
+
+  // obstáculos
+  for(let i=0;i<16;i++){
+    const kind = OBSTS[i%OBSTS.length];
+    const onPlat = (i%3!==0) ? pl[(i%pl.length)] : null;
+    const x = onPlat? onPlat.x + rnd(10,onPlat.w-20) : rnd(120,world.width-120);
+    const y = onPlat? onPlat.y-16 : 420-18;
+    obstacles.push({x,y,w:22,h:22,kind, hp: kind.type==='smoke'?2:Infinity, vx: (kind.type==='smoke'?rnd(-0.3,0.3):0), vy:0});
+  }
+}
+
+/* desenho de fundo: cidade (parallax) */
+function drawBackground(camX){
+  const w = canvas.width, h = canvas.height;
+  // céu (gradiente já no canvas)
+  // camada 1 — prédios distantes
+  ctx.save();
+  ctx.translate(-camX*0.2,0);
+  for(let i=0;i<30;i++){
+    const x=i*220, bw=160, bh= rnd(120,260);
+    ctx.fillStyle = '#12325f';
+    ctx.fillRect(x%3000, h-420-bh, bw, bh);
+    // janelas
+    ctx.fillStyle='rgba(255,255,255,.08)';
+    for(let y= h-420-bh+12; y<h-420; y+=18){
+      for(let j=0;j<Math.floor(bw/20); j++){
+        ctx.fillRect(x%3000 + 10 + j*18, y, 6, 8);
+      }
+    }
+  }
+  ctx.restore();
+
+  // camada 2 — prédios médios
+  ctx.save();
+  ctx.translate(-camX*0.4,0);
+  for(let i=0;i<24;i++){
+    const x=i*280, bw=200, bh=rnd(160,320);
+    ctx.fillStyle = '#1a3e73';
+    ctx.fillRect((x+80)%3000, h-380-bh, bw, bh);
+  }
+  ctx.restore();
+
+  // rua
+  ctx.fillStyle = '#0b1220';
+  ctx.fillRect(0, h-100, w, 100);
+  // faixa
+  ctx.strokeStyle='rgba(255,255,255,.5)';
+  ctx.setLineDash([12,12]); ctx.lineWidth=3;
+  ctx.beginPath(); ctx.moveTo(0, h-50); ctx.lineTo(w, h-50); ctx.stroke(); ctx.setLineDash([]);
+}
+
+/* desenhar caminhão com formas (geométrico) */
+function drawTruck(px,py){
+  // carroceria
+  ctx.fillStyle = '#2dd4bf'; // turquesa
+  ctx.fillRect(px-32, py-18, 64, 28);
+  // cabine
+  ctx.fillStyle = '#60a5fa';
+  ctx.fillRect(px+10, py-28, 28, 20);
+  // janela
+  ctx.fillStyle = '#93c5fd';
+  ctx.fillRect(px+16, py-24, 14, 12);
+  // rodas
+  ctx.fillStyle = '#111827';
+  ctx.beginPath(); ctx.arc(px-16, py+12, 10, 0, Math.PI*2); ctx.fill();
+  ctx.beginPath(); ctx.arc(px+22, py+12, 10, 0, Math.PI*2); ctx.fill();
+  // para-choque
+  ctx.fillStyle='#e5e7eb'; ctx.fillRect(px-34, py-14, 6, 8);
+  // símbolo reciclável
+  ctx.fillStyle='#16a34a';
+  ctx.fillRect(px-6, py-10, 12, 6);
+}
+
+/* desenhar itens */
+function drawPickup(p){
+  ctx.fillStyle = p.cat.color;
+  // ícones simples por categoria
+  switch(p.cat.name){
+    case 'Papel': // retângulo
+      ctx.fillRect(p.x-8, p.y-8, 16, 12); break;
+    case 'Plástico': // triângulo
+      ctx.beginPath(); ctx.moveTo(p.x, p.y-10); ctx.lineTo(p.x+10,p.y+6); ctx.lineTo(p.x-10,p.y+6); ctx.closePath(); ctx.fill(); break;
+    case 'Vidro': // círculo
+      ctx.beginPath(); ctx.arc(p.x, p.y, 8, 0, Math.PI*2); ctx.fill(); break;
+    case 'Metal': // losango
+      ctx.beginPath(); ctx.moveTo(p.x, p.y-10); ctx.lineTo(p.x+10, p.y); ctx.lineTo(p.x, p.y+10); ctx.lineTo(p.x-10, p.y); ctx.closePath(); ctx.fill(); break;
+  }
+}
+
+/* desenhar obstáculos */
+function drawObstacle(o){
+  if(o.kind.type==='smoke'){
+    ctx.fillStyle='rgba(148,163,184,.9)';
+    ctx.beginPath(); ctx.arc(o.x, o.y, 10, 0, Math.PI*2); ctx.fill();
+    ctx.beginPath(); ctx.arc(o.x+8, o.y-6, 8, 0, Math.PI*2); ctx.fill();
+  }else{ // oil
+    ctx.fillStyle='rgba(0,0,0,.8)';
+    ctx.beginPath();
+    ctx.ellipse(o.x, o.y+6, 18, 8, 0, 0, Math.PI*2); ctx.fill();
+  }
+}
+
+/* desenhar bala */
+function drawBullet(b){
+  ctx.fillStyle='#fef08a';
+  ctx.fillRect(b.x-4,b.y-2,8,4);
+}
+
+/* colisões AABB */
+function aabb(a,b){
+  return (a.x < b.x + b.w && a.x + a.w > b.x && a.y < b.y + b.h && a.y + a.h > b.y);
+}
+
+/* atualizar HUD */
+function renderLives(){
+  const livesEl = document.getElementById('lives');
+  livesEl.innerHTML='';
+  for(let i=0;i<lives;i++){
+    const d=document.createElement('span'); d.className='life'; livesEl.appendChild(d);
+  }
+}
+renderLives();
+
+/* ranking */
+function loadBoard(){ return JSON.parse(localStorage.getItem('eco_truck_board')||'[]'); }
+function saveBoard(board){ localStorage.setItem('eco_truck_board', JSON.stringify(board.slice(0,10))); }
+
+/* loop principal */
+let last=0;
+function loop(t){
+  requestAnimationFrame(loop);
+  const dt = (t-last)/16.67; last=t;
+  if(gameState!=='playing'){ drawSceneIdle(); return; }
+  update(dt);
+  render();
+}
+requestAnimationFrame(loop);
+
+function update(dt){
+  time += dt;
+
+  // entrada
+  if(keys['ArrowLeft']) { player.vx = clamp(player.vx - 0.8, -MAX_VX, MAX_VX); player.facing = -1; }
+  if(keys['ArrowRight']){ player.vx = clamp(player.vx + 0.8, -MAX_VX, MAX_VX); player.facing = +1; }
+  if(!keys['ArrowLeft'] && !keys['ArrowRight']) player.vx *= FRICTION;
+
+  // pulo
+  if(keys['ArrowUp'] && player.onGround){
+    player.vy = JUMP_VY; player.onGround=false;
+    beep(523.25, .1, 'sawtooth', .25);
+  }
+
+  // tiro
+  if(keys[' '] && player.canShoot){
+    player.canShoot=false; player.shootCooldown=12;
+    const speed = 9;
+    bullets.push({x:player.x+(player.facing>0?34:-34), y:player.y-8, vx:speed*player.facing, w:10,h:4});
+    // som tiro (curto)
+    beep(880,.06,'square',.35); setTimeout(()=>beep(660,.05,'square',.28),40);
+  }
+  if(!keys[' '] ) player.canShoot=true;
+  if(player.shootCooldown>0) player.shootCooldown--;
+
+  // física player
+  player.vy += G;
+  player.x += player.vx;
+  player.y += player.vy;
+
+  // colisão plataformas
+  player.onGround=false;
+  for(const p of platforms){
+    const rect = {x:p.x, y:p.y, w:p.w, h:p.h};
+    const me   = {x:player.x-24, y:player.y-24, w:48, h:48};
+    // vertical
+    if(aabb(me, rect)){
+      // detecta lado
+      const prevY = player.y - player.vy;
+      if(prevY+24 <= p.y){ // caiu sobre
+        player.y = p.y - 24;
+        player.vy = 0;
+        player.onGround = true;
+      }else if(prevY-24 >= p.y+p.h){ // bateu por baixo
+        player.y = p.y+p.h + 24;
+        player.vy = 0.5;
+      }else{
+        // colisão lateral
+        if(player.x < p.x) player.x = p.x - 24;
+        else player.x = p.x + p.w + 24;
+        player.vx *= -0.2;
+      }
+    }
+  }
+
+  // limites mundo
+  player.x = clamp(player.x, 24, world.width-24);
+  if(player.y > canvas.height+200){ loseLife(); }
+
+  // câmera
+  world.camX = clamp(player.x - canvas.width/2, 0, world.width - canvas.width);
+
+  // balas
+  for(let i=bullets.length-1;i>=0;i--){
+    const b=bullets[i];
+    b.x += b.vx;
+    if(b.x < 0 || b.x > world.width){ bullets.splice(i,1); continue; }
+    // hit em obstáculo
+    for(const o of obstacles){
+      if(o.kind.type==='oil') continue; // óleo não destrói
+      if(Math.abs(b.x - o.x) < (o.w/2+6) && Math.abs(b.y - o.y) < (o.h/2+6)){
+        o.hp -= 1; bullets.splice(i,1);
+        beep(220,.07,'triangle',.25);
+        break;
+      }
+    }
+  }
+  // remove obstáculos destruídos
+  for(let i=obstacles.length-1;i>=0;i--){
+    const o=obstacles[i];
+    // fumaça leve oscila
+    if(o.kind.type==='smoke'){ o.x += o.vx; o.y += Math.sin(time/10 + i)*0.15; }
+    if(o.hp<=0){
+      score += 12; // bônus por limpar poluição
+      obstacles.splice(i,1);
+    }
+  }
+
+  // colisão com pickups
+  for(let i=pickups.length-1;i>=0;i--){
+    const p = pickups[i];
+    if(Math.abs(player.x - p.x) < (player.w/2 + p.w/2) &&
+       Math.abs(player.y - p.y) < (player.h/2 + p.h/2)){
+      score += p.cat.score;
+      pickups.splice(i,1);
+      // som coleta
+      beep(659,.06,'square',.28); setTimeout(()=>beep(784,.07,'square',.2),60);
+    }
+  }
+
+  // colisão com obstáculos
+  for(const o of obstacles){
+    if(Math.abs(player.x - o.x) < 26 && Math.abs(player.y - o.y) < 26){
+      // encostar em óleo/fumaça causa dano
+      damage();
+      // empurra um pouco
+      player.vx += (player.x<o.x ? -2.5 : 2.5);
+    }
+  }
+}
+
+function damage(){
+  // invencibilidade curta
+  if(player._hurt && time - player._hurt < 30) return;
+  player._hurt = time;
+  beep(120,.12,'sawtooth',.4);
+  lives--; renderLives();
+  if(lives<=0){ endGame(); }
+}
+
+function loseLife(){
+  lives--; renderLives();
+  player.x = clamp(player.x, 80, world.width-80);
+  player.y = 300; player.vx=0; player.vy=0;
+  beep(120,.12,'sawtooth',.4);
+  if(lives<=0){ endGame(); }
+}
+
+function render(){
+  ctx.clearRect(0,0,canvas.width,canvas.height);
+  drawBackground(world.camX);
+
+  ctx.save();
+  ctx.translate(-world.camX,0);
+
+  // plataformas
+  for(const p of platforms){
+    ctx.fillStyle = p.type==='ground' ? '#14243f' : '#1b2f52';
+    ctx.fillRect(p.x, p.y, p.w, p.h);
+  }
+
+  // pickups
+  for(const c of pickups){ drawPickup(c); }
+
+  // obstáculos
+  for(const o of obstacles){ drawObstacle(o); }
+
+  // balas
+  for(const b of bullets){ drawBullet(b); }
+
+  // player
+  drawTruck(player.x, player.y);
+
+  ctx.restore();
+
+  // HUD score
+  document.getElementById('score').textContent = score;
+}
+
+function drawSceneIdle(){
+  // desenha uma cena congelada (para start/pause/gameover)
+  ctx.clearRect(0,0,canvas.width,canvas.height);
+  drawBackground(world.camX);
+  ctx.save();
+  ctx.translate(-world.camX,0);
+  for(const p of platforms){ ctx.fillStyle = p.type==='ground' ? '#14243f' : '#1b2f52'; ctx.fillRect(p.x,p.y,p.w,p.h); }
+  for(const c of pickups){ drawPickup(c); }
+  for(const o of obstacles){ drawObstacle(o); }
+  drawTruck(player.x, player.y);
+  ctx.restore();
+}
+
+/* ========= eventos ========= */
+window.addEventListener('keydown',e=>{
+  if(e.repeat) return;
+  if(e.key==='Enter'){ if(gameState==='start' || gameState==='gameover'){ startGame(); } }
+  if(e.key==='p' || e.key==='P'){ togglePause(); }
+  if(e.key==='m' || e.key==='M'){ toggleMute(); }
+  keys[e.key] = true;
+});
+window.addEventListener('keyup',e=>{ keys[e.key] = false; });
+
+document.getElementById('btnStart').onclick=()=>startGame();
+document.getElementById('startBtn2').onclick=()=>startGame();
+document.getElementById('btnPause').onclick=()=>togglePause();
+document.getElementById('btnMute').onclick=()=>toggleMute();
+
+function startGame(){
+  ensureAudio();
+  startMusic();
+  document.getElementById('startOverlay').style.display='none';
+  document.getElementById('gameOverOverlay').style.display='none';
+  buildLevel();
+  gameState='playing';
+  renderLives();
+}
+
+function endGame(){
+  gameState='gameover';
+  stopMusic();
+  // ranking
+  const board = loadBoard();
+  let name = prompt('Game Over! Digite suas iniciais (3 letras):','FEI') || 'ANON';
+  name = name.substring(0,3).toUpperCase();
+  board.push({name, score, date: new Date().toISOString()});
+  board.sort((a,b)=>b.score-a.score);
+  saveBoard(board);
+
+  const top = board.slice(0,10);
+  const rows = top.map((r,i)=>`<tr><td>${i+1}</td><td>${r.name}</td><td>${r.score}</td></tr>`).join('');
+  const panel = `
+    <h2 style="margin:.2rem 0">💥 Game Over</h2>
+    <p>Sua pontuação: <b>${score}</b></p>
+    <h3 style="margin:.2rem 0">🏆 Ranking</h3>
+    <div style="max-height:220px;overflow:auto">
+    <table style="width:100%;border-collapse:collapse;background:rgba(255,255,255,.06)">
+      <thead><tr><th style="text-align:left;padding:.4rem">#</th><th style="text-align:left;padding:.4rem">Jogador</th><th style="text-align:right;padding:.4rem">Score</th></tr></thead>
+      <tbody>${rows || '<tr><td colspan="3" style="padding:.4rem">Sem registros</td></tr>'}</tbody>
+    </table>
+    </div>
+    <div style="margin-top:.8rem;display:flex;gap:.5rem;justify-content:center">
+      <button class="btn" onclick="startGame()">Jogar novamente</button>
+      <button class="btn" onclick="document.getElementById('startOverlay').style.display='flex'">Tela inicial</button>
+      <button class="btn" onclick="clearBoard()">Limpar ranking</button>
+    </div>
+    <p style="opacity:.85;margin-top:.4rem">Dica: colete metais e vidro para pontuações maiores; destrua fumaça com <b>Espaço</b> e desvie de poças de óleo.</p>
+  `;
+  document.getElementById('gameOverPanel').innerHTML = panel;
+  document.getElementById('gameOverOverlay').style.display='flex';
+}
+function clearBoard(){
+  localStorage.removeItem('eco_truck_board');
+  document.getElementById('gameOverOverlay').style.display='none';
+  endGame(); // reabre com ranking limpo
+}
+
+function togglePause(){
+  if(gameState!=='playing'){ return; }
+  gameState='paused';
+  stopMusic();
+  const overlay = document.getElementById('startOverlay');
+  overlay.style.display='flex';
+  overlay.querySelector('.panel').innerHTML = `
+    <h2>⏸️ Jogo pausado</h2>
+    <p>Pressione <span class="kbd">P</span> para continuar.</p>
+    <div class="legend">
+      <span class="tag">← → mover</span>
+      <span class="tag">↑ pular</span>
+      <span class="tag">Espaço atirar</span>
+    </div>
+    <button class="btn" onclick="resume()">Retomar</button>
+  `;
+}
+function resume(){
+  document.getElementById('startOverlay').style.display='none';
+  gameState='playing';
+  startMusic();
+}
+
+function toggleMute(){
+  musicOn = !musicOn;
+  const b=document.getElementById('btnMute');
+  b.textContent = `Som: ${musicOn?'ON':'OFF'} (M)`;
+  if(musicOn){ ensureAudio(); startMusic(); } else { stopMusic(); }
+}
+
+/* inicia na tela de start */
+buildLevel(); // pré-carrega cenário para um plano de fundo simpático
+drawSceneIdle();
+</script>
+</body>
+</html>
